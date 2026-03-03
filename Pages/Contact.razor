@@ -1,0 +1,82 @@
+﻿@page "/feedback/{EventId}"
+@using EventUserDashboard.Models
+@inject IJSRuntime JS
+
+<h3>Leave Your Feedback</h3>
+
+<div class="form-group">
+    <label>Full Name</label>
+    <InputText class="form-control" @bind-Value="feedback.FullName" />
+</div>
+
+<div class="form-group">
+    <label>Email</label>
+    <InputText class="form-control" @bind-Value="feedback.Email" />
+</div>
+
+<div class="form-group">
+    <label>Rating (1–5)</label>
+    <InputNumber class="form-control" @bind-Value="feedback.Rating" />
+</div>
+
+<div class="form-group">
+    <label>Comment</label>
+    <InputTextArea class="form-control" @bind-Value="feedback.Comment" />
+</div>
+
+<br />
+
+<button class="btn btn-primary" @onclick="SubmitFeedback">
+    Submit Feedback
+</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="mt-2">@message</p>
+}
+
+@code {
+    [Parameter]
+    public string EventId { get; set; }
+
+    private FeedbackModel feedback = new();
+    private string message;
+
+    private async Task SubmitFeedback()
+    {
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(feedback.FullName) ||
+            string.IsNullOrWhiteSpace(feedback.Email) ||
+            string.IsNullOrWhiteSpace(feedback.Comment) ||
+            feedback.Rating < 1 || feedback.Rating > 5)
+        {
+            message = "Please fill all fields correctly.";
+            return;
+        }
+
+        feedback.EventId = EventId;
+
+        var result = await JS.InvokeAsync<SaveResult>(
+            "firebaseInterop.SaveFeedback",
+            EventId,
+            feedback
+        );
+
+        if (result.success)
+        {
+            message = "Thank you for your feedback!";
+            feedback = new FeedbackModel(); // reset form
+        }
+        else
+        {
+            message = "Failed to submit feedback.";
+        }
+    }
+
+    public class SaveResult
+    {
+        public bool success { get; set; }
+        public string id { get; set; }
+        public string error { get; set; }
+    }
+}

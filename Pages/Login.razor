@@ -1,0 +1,87 @@
+﻿@page "/Login"
+@using EventUserDashboard.Models
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<h3>Login</h3>
+<hr />
+
+<!-- Login Inputs -->
+<input @bind="email" class="form-control mb-2" placeholder="Enter Email"/>
+<input @bind="password" class="form-control mb-2" type="password" placeholder="Enter password"/>
+
+<!-- Login Button -->
+<button class="btn btn-success" @onclick="HandleLogin">Sign In</button>
+<button class="btn btn-danger" @onclick='() => Nav.NavigateTo("/")'>Cancel</button>
+<br />
+<button class="btn btn-light btn-outline-danger mt-4" @onclick='() => Nav.NavigateTo("/Signup")'>Click Here to Register</button>
+<!-- Error Message -->
+@if (!string.IsNullOrEmpty(error))
+{
+    <p class="text-danger">@error</p>
+}
+
+@if (!string.IsNullOrEmpty(success))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @success
+        <button type="button" class="btn-close" @onclick="() => success = null"></button>
+    </div>
+}
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string error = "";
+    private string success = "";
+
+    // JS return type for signIn
+    public class AuthResult
+    {
+        public bool Success { get; set; }
+        public string Error { get; set; }
+    }
+
+    private async Task HandleLogin()
+    {
+       
+        error = "";
+        success = "";
+
+        try
+        {
+           
+            var result = await JS.InvokeAsync<AuthResult>("firebaseAuth.signIn", email, password);
+
+            if (!result.Success)
+            {
+                error = result.Error;
+                return;
+            }
+
+            
+            var user = await JS.InvokeAsync<User>("firebaseAuth.getUser");
+
+            if (user == null)
+            {
+                error = "Failed to fetch user info.";
+                return;
+            }
+
+            // Check role
+            if (user.Role == "user")
+            {
+                success = "Login Successful!";
+                Nav.NavigateTo("/");
+            }
+            else
+            {
+                error = "Access denied: You are not an user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Login failed: {ex.Message}";
+        }
+    }
+}

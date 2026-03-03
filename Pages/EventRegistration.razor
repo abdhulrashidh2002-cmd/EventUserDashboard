@@ -1,0 +1,166 @@
+﻿@page "/BookEvents/{EventId}"
+
+@using EventUserDashboard.Models
+@using EventUserDashboard.Services
+@inject AuthService AuthService
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<h3>Event Registration</h3>
+
+@if (selectedEvent == null)
+{
+    <div class="alert alert-info">Loading event details...</div>
+}
+else
+{
+    <EditForm Model="rsvp" OnValidSubmit="HandleBooking">
+        <DataAnnotationsValidator />
+
+        <div class="mb-2">
+            <label>Event Title</label>
+            <InputText class="form-control" @bind-Value="selectedEvent.Title" readonly />
+        </div>
+
+        <div class="mb-2">
+            <label>Full Name</label>
+            <InputText class="form-control" @bind-Value="rsvp.FullName" readonly/>
+        </div>
+
+        <div class="mb-2">
+            <label>Email</label>
+            <InputText class="form-control" @bind-Value="rsvp.Email" readonly />
+        </div>
+
+        <div class="mb-2">
+            <label>Guests</label>
+            <InputNumber class="form-control" @bind-Value="rsvp.Guests" @oninput="UpdateTotal" required />
+        </div>
+
+        <div class="mb-2">
+            <label>Payment Method</label>
+            <InputSelect class="form-control" @bind-Value="rsvp.PaymentMethod" required>
+                <option value="">Select</option>
+                <option>Card</option>
+                
+            </InputSelect>
+        </div>
+
+        <div class="mb-2">
+            <label>Ticket Price</label>
+            <InputNumber class="form-control" @bind-Value="rsvp.TicketPrice" readonly />
+        </div>
+
+        <p><b>Total: @(selectedEvent != null ? selectedEvent.Price * Math.Max(rsvp.Guests, 1) : 0)</b></p>
+
+        <button class="btn btn-success">Proceed Payment</button>
+        <button class="btn btn-danger m-2" @onclick='() => Nav.NavigateTo("/")'>Home</button>
+
+    </EditForm>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info mt-2">@message</div>
+}
+
+@code {
+    [Parameter] public string EventId { get; set; } = "";
+
+    private Rsvp rsvp = new();
+    private EventModel? selectedEvent;
+    private string message = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user == null)
+        {
+            Nav.NavigateTo("/Login");
+            return;
+        }
+
+        rsvp.FullName = user.Name;
+        rsvp.Email = user.Email;
+
+        // Load event details
+        if (!string.IsNullOrEmpty(EventId))
+        {
+            selectedEvent = await JS.InvokeAsync<EventModel>("firebaseInterop.getEventById", EventId);
+            if (selectedEvent != null)
+            {
+                rsvp.TicketPrice = selectedEvent.Price;
+                rsvp.Total = rsvp.TicketPrice * Math.Max(rsvp.Guests, 1);
+            }
+            else
+            {
+                message = "Event not found!";
+            }
+        }
+    }
+
+    private void UpdateTotal(ChangeEventArgs e)
+    {
+        if (selectedEvent != null && rsvp.Guests > 0)
+        {
+            rsvp.Total = rsvp.Guests * selectedEvent.Price;
+        }
+    }
+
+    private async Task HandleBooking()
+    {
+        if (selectedEvent == null) return;
+            rsvp.Total = rsvp.TicketPrice * Math.Max(rsvp.Guests, 1);
+            var paymentSuccess = await DummyPayment();
+            if (!paymentSuccess)
+            {
+                message = "Payment Failed!";
+                return;
+            }
+            rsvp.TransactionId = "TXN-" + Guid.NewGuid().ToString().Substring(0, 8);
+            rsvp.RegisteredAt = DateTime.Now;
+
+
+            var user = await AuthService.GetCurrentUserAsync();
+            if (user == null)
+            {
+                message = "You must be logged in to register for event.";
+                return;
+            }
+            rsvp.UserId = user.Uid;
+            rsvp.EventId = EventId;
+
+            var result = await JS.InvokeAsync<SaveResult>(
+                "firebaseInterop.SaveRsvp",
+            rsvp
+        );
+
+        if (result.success)
+        {
+            message = "Booking Successful!";
+            rsvp.Guests = 1;
+            rsvp.PaymentMethod = "";
+            rsvp.Total = rsvp.TicketPrice;
+        }
+        else
+        {
+            message = result.message ?? "Booking failed!";
+        }
+    }   
+
+    
+    private async Task<bool> DummyPayment()
+    {
+        message = "Processing Payment...";
+        await Task.Delay(3000);
+        return true;
+    }
+
+    public class SaveResult
+    {
+        public bool success { get; set; }
+        public string id { get; set; }
+        public string message { get; set; }
+    }
+}

@@ -1,0 +1,32 @@
+﻿@inject NavigationManager Nav
+
+<div class="navbar navbar-dark bg-secondary navbar-expand-lg">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">EventUserDashboard</a>
+
+        <button class="navbar-toggler" type="button" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="navbar-collapse @NavMenuCssClass" id="navbarNav">
+            <nav class="navbar-nav ms-auto">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+                <NavLink class="nav-link" href="ViewEvents">View Events</NavLink>
+                
+                <button class="btn btn-success" @onclick='() => Nav.NavigateTo("/Login")'>Login</button>
+            </nav>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

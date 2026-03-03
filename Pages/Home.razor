@@ -1,0 +1,18 @@
+﻿@page "/"
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Home</PageTitle>
+
+<div class="text-center py-5 bg-light rounded shadow-sm">
+    <h1 class="display-4 fw-bold">Welcome to Strat Night 2026 🎉</h1>
+    <p class="lead mt-3">
+        Join us for an unforgettable evening of music, networking, and celebration.
+        Check out upcoming events and RSVP now!
+    </p>
+    <NavLink >
+        <button class="btn btn-primary btn-lg mt-3" @onclick='() => Nav.NavigateTo("/ViewEvents")'> View Events</button>
+       
+    </NavLink>
+</div>
+

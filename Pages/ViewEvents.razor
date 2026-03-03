@@ -1,0 +1,206 @@
+﻿@page "/ViewEvents"
+@using EventUserDashboard.Models
+@using EventUserDashboard.Services
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<h3 class="fw-bold">Our Campus events</h3>
+<div class="mb-4">
+    <input type="text" class="form-control" placeholder="Search events..."
+           @bind="searchTerm" @bind:event="oninput" />
+</div>
+
+@if (isLoading)
+{
+    <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    
+}
+else if (!events.Any())
+{
+    <div> No Events found.</div>
+}
+else
+{
+    <div class="row">
+        <h3 class="mb-4"><b>Upcoming Events:</b></h3>
+        @foreach (var e in UpcomingEvents)
+        {
+            <div class="col-md-3 mb-3 card h-auto shadow-sm">
+                <div class="card h-auto shadow-sm" @onclick="@(() => ShowEvent(e))" style="cursor:pointer;">
+                    <h3>Title :@e.Title</h3>
+                    <img class="card-img-top" src="@e.ImageUrl"
+                    style="height-140px; object-fit; cover;" />
+                    <div class="card-body d-flex flex-column">
+                        <p>Category :@e.Category</p>
+                        <p>Maximum Students can enroll: @e.Capacity</p>
+                        <span>Date : @e.Date</span>
+                        <p>Venue : @e.Location</p>
+                        <span>Ticket Price: @e.Price</span>
+                        <span style="color:blue; text-decoration:none">Click the card to see more.....</span>
+                        
+                    </div>
+                    
+                </div>
+                <div class="modal-footer m-3" style="display:flex;align-items:flex-start;justify-content:start">
+                    <button class="btn btn-primary" style="background:linear-gradient(140deg,navy,Blue); cursor:pointer"
+                    @onclick="() => NavigateToBooking(e.Id)"
+                    >To Register</button>
+                </div>
+            </div>
+        }
+
+
+    </div>
+
+    <div class="row">
+        <h3 class="mb-4"><b>Ongoing Events:</b></h3>
+        @foreach (var e in OnGoingEvents)
+        {
+            <div class="col-md-3 mb-3 card h-auto shadow-sm">
+                <div class="card h-auto shadow-sm" @onclick="@(() => ShowEvent(e))" style="cursor:pointer;">
+                    <h3>Title :@e.Title</h3>
+                    <img class="card-img-top" src="@e.ImageUrl"
+                         style="height-140px; object-fit; cover;" />
+                    <div class="card-body d-flex flex-column">
+                        <p>Category :@e.Category</p>
+                        <p>Maximum Students can enroll: @e.Capacity</p>
+                        <span>Date : @e.Date</span>
+                        <p>Venue : @e.Location</p>
+                        <span>Ticket Price: @e.Price</span>
+                        <span style="color:blue; text-decoration:none">Click the card to see more.....</span>
+
+                    </div>
+
+                </div>
+                
+            </div>
+        }
+
+
+    </div>
+
+    <div class="row">
+        <h3 class="mb-4"><b>Past Events:</b></h3>
+        @foreach (var e in CompletedEvents)
+        {
+            <div class="col-md-3 mb-3">
+                <div class="card h-auto shadow-sm mb-2" @onclick="@(() => ShowEvent(e))" style="cursor:pointer;">
+                    <h3>Title :@e.Title</h3>
+                    <img class="card-img-top mb-2" src="@e.ImageUrl"
+                         style="height-140px; object-fit; cover;" />
+                    <div class="card-body d-flex flex-column">
+                        <p>Category :@e.Category</p>
+                        <span>Date : @e.Date</span>
+                        <span style="color:blue; text-decoration:none">Click the card to see more.....</span>
+                    </div>
+                    <button class="btn btn-primary" style="background:linear-gradient(140deg,navy,Blue); cursor:pointer"
+                    @onclick="() => NavigateToFeedback(e.Id)"
+                    >Provide Feedback</button>
+                </div>
+
+            </div>
+        }
+
+
+    </div>
+}
+@if (showModal && selectedEvent != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@selectedEvent.Title</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <img src="@selectedEvent.ImageUrl" class="img-fluid mb-3" />
+                    <p><b>Category:</b> @selectedEvent.Category</p>
+                    <p><b>Date:</b> @selectedEvent.Date</p>
+                    <p><b>Venue:</b> @selectedEvent.Location</p>
+                    <p><b>Capacity:</b> @selectedEvent.Capacity</p>
+                    <p><b>Price:</b> @selectedEvent.Price</p>
+                    <p><b>Status:</b> @selectedEvent.Status</p>
+                    <p><b>Description:</b> @selectedEvent.Description</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+            
+            
+        </div>
+    </div>
+}
+
+
+
+@code {
+    private string searchTerm = "";
+     private List<EventViewModel> events = new();
+    
+    private IEnumerable<EventViewModel> FilteredEvents =>
+        string.IsNullOrWhiteSpace(searchTerm)
+            ? events
+        : events.Where(e => e.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                             || e.Category.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    private List<EventViewModel> UpcomingEvents => FilteredEvents.Where(e => e.Date > DateTime.Now).OrderBy(e => e.Date).Take(5).ToList();
+    private List<EventViewModel> OnGoingEvents => FilteredEvents.Where(e => e.Date.Date == DateTime.Now.Date)
+        .OrderBy(e => e.Date)
+        .Take(5)
+        .ToList();
+    private List<EventViewModel> CompletedEvents => FilteredEvents.Where(e => e.Date.Date < DateTime.Now.Date)
+        .OrderBy(e => e.Date)
+        .Take(5)
+        .ToList();
+
+
+    private bool isLoading = true;
+    string message = "";
+    private EventViewModel? selectedEvent;
+    private bool showModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        try
+        {
+            events = await JS.InvokeAsync<List<EventViewModel>>("firebaseInterop.getEvents");
+        }
+        catch (Exception e)
+        {
+            message = "Error message on fetching events" + e.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    private void ShowEvent(EventViewModel e)
+    {
+        selectedEvent = e;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        selectedEvent = null;
+        showModal = false;
+    }
+
+    private void NavigateToBooking(string id) => Nav.NavigateTo($"/BookEvents/{id}");
+    private void NavigateToFeedback(string id) => Nav.NavigateTo($"/feedback/{id}");
+
+    public class EventViewModel : EventModel { }
+
+    
+}

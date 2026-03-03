@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EventUserDashboard</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="EventUserDashboard.styles.css" rel="stylesheet" />
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <script type="importmap"></script>
+    <!-- Firebase and interop JS -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+        getFirestore,
+        collection,
+        addDoc,
+        doc,
+        setDoc,
+        getDocs,
+        getDoc,
+        deleteDoc
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getStorage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+    import {createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    // Firebase config
+    const firebaseConfig = {
+        apiKey: "AIzaSyBXD-Nkq6qkjCB6i03bSWpnK_K2P5RPWM8",
+        authDomain: "eventmanagementdb-1f90b.firebaseapp.com",
+        projectId: "eventmanagementdb-1f90b",
+        storageBucket: "eventmanagementdb-1f90b.appspot.com", 
+        messagingSenderId: "753610326935",
+        appId: "1:753610326935:web:59c96629104d954efe3ad2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const auth = getAuth(app);
+
+    // Firebase Auth Wrapper
+    window.firebaseAuth = {
+        signIn: async (email, password) => {
+            try {
+                const userInfo = await signInWithEmailAndPassword(auth, email, password);
+                return { success: true, email: userInfo.user.email };
+            } catch (e) {
+                return { success: false, error: e.message };
+            }
+        },
+        logout: async () => {
+            await signOut(auth);
+        },
+        getUser: async () => {
+            const user = auth.currentUser;
+            if (!user) return null;
+
+            try {
+
+                const docRef = doc(db, "users", user.uid);
+                const docSnap = await getDoc(docRef);
+                const userData = docSnap.exists() ? docSnap.data() : {};
+
+                return {
+                    uid: user.uid,
+                    email: user.email,
+                    role: userData.role || null,
+                    name: userData.name || null
+                };
+            } catch (e) {
+                console.error("getUser error:", e);
+                return {
+                    uid: user.uid,
+                    email: user.email,
+                    role: null,
+                    name: null
+                };
+            }
+        },
+        getUserRole: async (uid) => {
+            try {
+                const docRef = doc(db, "users", uid);
+                const docSnap = await getDoc(docRef);
+                return docSnap.exists() ? docSnap.data().role : null;
+            } catch (e) {
+                console.error("getUserRole error:", e);
+                return null;
+            }
+        }
+    };
+
+    
+    window.firebaseInterop = window.firebaseInterop || {};
+
+    window.firebaseInterop = {
+    registerUser: async (email, password,name) => {
+        try {
+            
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userId = userCredential.user.uid;
+
+            await setDoc(doc(db, "users", userId), {
+                userId: userId,
+                email:email,
+                name:name,
+                role: "user"
+            });
+
+            return { success: true, userId: userId };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+};
+
+     window.firebaseInterop.SaveRsvp = async (rsvp) => {
+        try {
+            if (!rsvp.eventId) throw new Error("EventId is required");
+
+            const eventRef = doc(db, "event", rsvp.eventId);
+            const rsvpsRef = collection(eventRef, "rsvps");
+
+            const docRef = doc(rsvpsRef);
+            rsvp.id = docRef.id;
+            await setDoc(docRef, rsvp);
+            return { success: true, id: docRef.id };
+        } catch (e) {
+            console.error("SaveRsvp error:", e);
+            return { success: false, error: e.message };
+        }
+};
+
+    window.firebaseInterop.getEvents = async () => {
+    const querySnap = await getDocs(collection(db, "event"));
+
+    return querySnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            ...data,
+            id: doc.id
+        };
+    });
+};
+  
+
+    window.firebaseInterop.getEventById = async (id) => {
+        const docRef = doc(db, "event", id);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? { Id: docSnap.id, ...docSnap.data() } : null;
+    };
+
+   
+    window.firebaseInterop.getFeedbacks = async (eventId) => {
+        try {
+            const feedbackSnap = await getDocs(collection(db, `event/${eventId}/feedback`));
+            return feedbackSnap.docs.map(doc => ({
+                Id: doc.id,
+                ...doc.data(),
+                Date: doc.data().Date ? new Date(doc.data().Date.seconds * 1000) : null
+            }));
+        } catch (e) {
+            console.error("getFeedbacks error:", e);
+            return [];
+        }
+    };
+
+    window.firebaseInterop.SaveFeedback = async (eventId, feedback) => {
+    try {
+        const feedbackRef = collection(db, `event/${eventId}/feedback`);
+        const docRef = doc(feedbackRef);  // generate ID first
+
+        feedback.id = docRef.id;
+        feedback.date = new Date();
+
+        await setDoc(docRef, feedback);
+
+        return { success: true, id: docRef.id };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+};
+
+    
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });</script>
+</body>
+
+</html>
